@@ -6,3 +6,5 @@ class Settings(BaseSettings):
 
     service_name: str = "service_template"
     environment: str = "local"
+    log_level: str = "INFO"
+    log_json: bool = True
