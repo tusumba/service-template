@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: ruff, mypy, pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Ruff format
+        run: uv run --no-sync ruff format --check .
+      - name: Ruff lint
+        run: uv run --no-sync ruff check .
+      - name: Mypy
+        run: uv run --no-sync mypy app tests migrations
+      - name: Pytest
+        run: uv run --no-sync pytest
+
+  compose:
+    name: docker compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start
+        run: docker compose up -d --build
+      - name: Wait for /health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              echo
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Service did not become healthy" >&2
+          exit 1
+      - name: Check migrations
+        run: |
+          test "$(docker compose ps -a migrate --format '{{.ExitCode}}')" = "0"
+          docker compose exec -T postgres psql -U tusumba -d tusumba -tAc \
+            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'service_template' AND table_name = 'alembic_version'" \
+            | grep -qx 1
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color
+      - name: Stop
+        if: always()
+        run: docker compose down -v
