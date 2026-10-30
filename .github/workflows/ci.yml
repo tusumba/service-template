@@ -31,9 +31,41 @@ jobs:
       - name: Ruff lint
         run: uv run --no-sync ruff check .
       - name: Mypy
-        run: uv run --no-sync mypy app tests migrations
+        run: uv run --no-sync mypy app tests migrations scripts
       - name: Pytest
         run: uv run --no-sync pytest
+
+  new-service:
+    name: new service from template
+    if: github.repository == 'tusumba/service-template'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: template
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: template/uv.lock
+      - name: Copy template and rename
+        run: |
+          cp -r template demo-service
+          rm -rf demo-service/.git
+          python3 demo-service/scripts/new_service.py demo
+          if grep -rn "service_template\|service-template" demo-service; then
+            echo "Template name left after rename" >&2
+            exit 1
+          fi
+      - name: Checks in the new service
+        working-directory: demo-service
+        run: |
+          uv sync --locked
+          uv run --no-sync ruff format --check .
+          uv run --no-sync ruff check .
+          uv run --no-sync mypy app tests migrations
+          uv run --no-sync pytest
 
   compose:
     name: docker compose
