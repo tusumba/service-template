@@ -6,11 +6,13 @@
 
 ## Что внутри
 
-- FastAPI (Python 3.12, Pydantic v2), публичные пути под `/v1`, настройки из переменных окружения;
-- SQLAlchemy 2 (async) и Alembic, у сервиса своя схема PostgreSQL;
-- JSON-логи с `request_id` и `GET /health`;
-- Dockerfile и `compose.yaml` (сервис, миграции, PostgreSQL 16);
-- тесты на pytest + testcontainers с настоящим PostgreSQL;
+- FastAPI (Python 3.12, Pydantic v2);
+- публичные пути под `/v1`;
+- настройки из переменных окружения;
+- SQLAlchemy 2 (async) и Alembic;
+- JSON-логи;
+- Dockerfile и `compose.yaml`;
+- тесты на pytest + testcontainers;
 - CI: ruff, mypy, pytest, проверка в docker compose.
 
 ## Как создать сервис
@@ -65,30 +67,20 @@ uv run pytest
 |---|---|---|
 | `DATABASE_URL` | обязательна | `postgresql+asyncpg://user:password@host:5432/db` |
 | `SERVICE_NAME` | имя сервиса | попадает в логи |
-| `ENVIRONMENT` | `local` | `local`, `test`, `stage`, `prod` |
 | `LOG_LEVEL` | `INFO` | уровень логов |
 | `LOG_JSON` | `true` | `false` — читаемые логи для отладки |
 | `DATABASE_POOL_SIZE` | `5` | размер пула соединений |
 | `DATABASE_ECHO` | `false` | печатать SQL-запросы |
 
-## Как добавить
-
-- **Эндпоинт:** роутер в `app/api/v1/<модуль>.py`, подключить в `app/api/v1/__init__.py`.
-  Сессия БД в роуте — параметр `session: Session` из `app.db`.
-- **Таблицу:** модель в `app/models/`, импорт в `app/models/__init__.py`, затем
-  `uv run alembic revision --autogenerate -m "что изменилось"`. Проверьте миграцию и `downgrade`.
-- **Тест:** фикстуры `client` (FastAPI с настоящей БД) и `session` (изменения откатываются после теста)
-  из `tests/conftest.py`.
-
 ## Структура
 
 ```
 app/
-  main.py          create_app(): логи, request_id, подключение к БД, роутеры
-  settings.py      настройки из окружения
+  main.py          create_app()
+  settings.py      настройки окружения
   logging.py       JSON-логи
   middleware.py    request_id и лог запросов
-  db.py            engine, сессии, зависимость Session
+  db.py            сессии
   api/health.py    /health
   api/v1/          публичные роутеры
   models/          модели SQLAlchemy, схема сервиса
@@ -99,12 +91,10 @@ scripts/           new_service.py — переименование шаблон�
 
 ## Документация
 
-Wiki проекта: https://ai.nsu.ru/projects/tusumba/wiki/Архитектура. Задачи ведутся в Redmine: https://ai.nsu.ru/projects/tusumba. Issues и Wiki GitHub выключены.
+Wiki проекта: https://ai.nsu.ru/projects/tusumba/wiki/Архитектура.
+
+Задачи ведутся в Redmine: https://ai.nsu.ru/projects/tusumba.
 
 ## Правила работы
 
-Ветки, коммиты, pull request и code review описаны в [CONTRIBUTING.md](https://github.com/tusumba/.github/blob/main/CONTRIBUTING.md). Коротко:
-
-- ветка называется `feature/<номер задачи Redmine>-<пара слов>`, например `feature/18901-login`;
-- номер задачи указывается в каждом коммите и в названии PR;
-- в `main` изменения попадают только через PR с одним одобрением и зелёным CI, прямой push и force push запрещены.
+Описаны в [CONTRIBUTING.md](https://github.com/tusumba/.github/blob/main/CONTRIBUTING.md). 
