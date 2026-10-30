@@ -9,7 +9,11 @@ from app.settings import Settings
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(service_name="service_template", environment="test")
+    return Settings(
+        service_name="service_template",
+        environment="test",
+        database_url="postgresql+asyncpg://test:test@localhost:5432/test",
+    )
 
 
 @pytest.fixture
