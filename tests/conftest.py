@@ -1,14 +1,15 @@
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
+import httpx2
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi.testclient import TestClient
+from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 from testcontainers.community.postgres import PostgresContainer
 
-from app.db import create_engine
+from app.db import create_engine, get_session
 from app.main import create_app
 from app.settings import Settings
 
@@ -46,12 +47,6 @@ def settings(database_url: str, migrated: None) -> Settings:
 
 
 @pytest.fixture
-def client(settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(settings)) as test_client:
-        yield test_client
-
-
-@pytest.fixture
 async def session(settings: Settings) -> AsyncIterator[AsyncSession]:
     engine = create_engine(settings)
     async with engine.connect() as connection:
@@ -62,3 +57,19 @@ async def session(settings: Settings) -> AsyncIterator[AsyncSession]:
             yield db_session
         await transaction.rollback()
     await engine.dispose()
+
+
+@pytest.fixture
+def app(settings: Settings) -> FastAPI:
+    return create_app(settings)
+
+
+@pytest.fixture
+async def client(app: FastAPI, session: AsyncSession) -> AsyncIterator[httpx2.AsyncClient]:
+    async def test_session() -> AsyncIterator[AsyncSession]:
+        yield session
+
+    app.dependency_overrides[get_session] = test_session
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="http://test") as test_client:
+        yield test_client
