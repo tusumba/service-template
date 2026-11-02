@@ -1,6 +1,6 @@
 # service-template
 
-Шаблон сервиса бэкенда Tusumba. От него стартуют все сервисы, чтобы у них было одинаковое устройство.
+Шаблон сервиса бэкенда Tusumba.
 
 **Ответственный:** Глеб Эстраих (задача #18887).
 
@@ -52,8 +52,6 @@ uv run mypy app tests migrations
 uv run pytest
 ```
 
-Для тестов должен быть запущен Docker: testcontainers поднимает PostgreSQL 16.
-
 ## Переменные окружения
 
 | Переменная | По умолчанию | Что это |
@@ -87,7 +85,3 @@ scripts/           new_service.py — переименование шаблон�
 Wiki проекта: https://ai.nsu.ru/projects/tusumba/wiki/Архитектура.
 
 Задачи ведутся в Redmine: https://ai.nsu.ru/projects/tusumba.
-
-## Правила работы
-
-Описаны в [CONTRIBUTING.md](https://github.com/tusumba/.github/blob/main/CONTRIBUTING.md). 
