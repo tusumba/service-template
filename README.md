@@ -6,14 +6,7 @@
 
 ## Что внутри
 
-- FastAPI (Python 3.12, Pydantic v2);
-- публичные пути под `/v1`;
-- настройки из переменных окружения;
-- SQLAlchemy 2 (async) и Alembic;
-- JSON-логи;
-- Dockerfile и `compose.yaml`;
-- тесты на pytest + testcontainers;
-- CI: ruff, mypy, pytest, проверка в docker compose.
+смотрите в pyproject.toml 
 
 ## Как создать сервис
 

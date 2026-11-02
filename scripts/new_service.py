@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+TEMPLATE_ONLY_JOB = "  new-service:"
 SCHEMA_PLACEHOLDER = "service_template"
 REPO_PLACEHOLDER = "service-template"
 SKIP_DIRS = {".git", ".venv", ".mypy_cache", ".ruff_cache", ".pytest_cache", "__pycache__"}
@@ -25,6 +27,20 @@ def text_files() -> list[Path]:
     return files
 
 
+def drop_template_only_job(text: str) -> str:
+    kept = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        if line.rstrip("\n") == TEMPLATE_ONLY_JOB:
+            skipping = True
+            continue
+        if skipping and re.match(r"^  \S", line):
+            skipping = False
+        if not skipping:
+            kept.append(line)
+    return "".join(kept)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Создать сервис из шаблона: переименовать его.")
     parser.add_argument("name", help="имя сервиса латиницей, например events")
@@ -36,7 +52,8 @@ def main() -> int:
     changed = []
     for path in text_files():
         text = path.read_text(encoding="utf-8")
-        updated = text.replace(REPO_PLACEHOLDER, repo_name).replace(SCHEMA_PLACEHOLDER, name)
+        updated = drop_template_only_job(text) if path == CI_WORKFLOW else text
+        updated = updated.replace(REPO_PLACEHOLDER, repo_name).replace(SCHEMA_PLACEHOLDER, name)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
             changed.append(path.relative_to(ROOT))
