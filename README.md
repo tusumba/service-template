@@ -85,3 +85,7 @@ scripts/           new_service.py — переименование шаблон�
 Wiki проекта: https://ai.nsu.ru/projects/tusumba/wiki/Архитектура.
 
 Задачи ведутся в Redmine: https://ai.nsu.ru/projects/tusumba.
+
+## Правила работы
+
+Описаны в [CONTRIBUTING.md](https://github.com/tusumba/.github/blob/main/CONTRIBUTING.md).
