@@ -30,10 +30,14 @@
 ```bash
 uv sync
 cp .env.example .env
+uv run python -m tusumba_common.testing dev-keys   # тестовая пара ключей, впишите public.pem в JWT_PUBLIC_KEY
 docker compose up -d postgres
 uv run alembic upgrade head
-uv run uvicorn app.main:create_app --factory --reload
+uv run --env-file .env uvicorn app.main:create_app --factory --reload
 ```
+
+`JWT_PUBLIC_KEY` и `SERVICE_TOKEN` читает tusumba-common из окружения процесса, а не из `Settings`,
+поэтому сервис запускается с `--env-file .env`.
 
 Сервис: http://127.0.0.1:8000/health, документация API: http://127.0.0.1:8000/docs.
 
@@ -62,6 +66,23 @@ uv run pytest
 | `LOG_JSON` | `true` | `false` — читаемые логи для отладки |
 | `DATABASE_POOL_SIZE` | `5` | размер пула соединений |
 | `DATABASE_ECHO` | `false` | печатать SQL-запросы |
+| `JWT_PUBLIC_KEY` | обязательна для путей со входом | публичный ключ Identity в PEM, проверка access-токенов (tusumba-common) |
+| `SERVICE_TOKEN` | обязательна для `/internal` | общий сервисный токен для заголовка `X-Service-Token` (tusumba-common) |
+
+## Авторизация и ошибки
+
+Шаблон подключает [tusumba-common](https://github.com/tusumba/tusumba-common) по тегу версии
+(`pyproject.toml`), как требует #18886:
+
+- `install_error_handlers` в `create_app()`: любая ошибка, включая валидацию и 404, приходит в формате
+  `{"error": {"code": "...", "message": "...", "details": [...]}}`, как в OpenAPI сервисов;
+- `Depends(get_current_user)` - путь только со входом (access-токен JWT RS256), `Depends(optional_user)` -
+  можно без входа, но испорченный токен даёт 401; пример - `app/api/v1/example.py`;
+- `/internal` - роутер с `dependencies=[Depends(require_service)]`: без верного `X-Service-Token` ответ 403;
+  пример - `app/api/internal.py`. Вызовы других сервисов - через `InternalClient`.
+
+Примеры `/v1/example/...` и `/internal/example/ping` замените своими роутерами. Тесты на токены и формат
+ошибок - `tests/test_auth.py`, токены выпускает `tusumba_common.testing.make_token`.
 
 ## Структура
 
@@ -73,7 +94,8 @@ app/
   middleware.py    request_id и лог запросов
   db.py            сессии
   api/health.py    /health
-  api/v1/          публичные роутеры
+  api/v1/          публичные роутеры (example.py - пример со входом)
+  api/internal.py  пути /internal по сервисному токену
   models/          модели SQLAlchemy, схема сервиса
 migrations/        Alembic
 tests/             pytest + testcontainers
