@@ -5,6 +5,8 @@ x-service: &service
     SERVICE_NAME: service_template
     ENVIRONMENT: local
     DATABASE_URL: postgresql+asyncpg://tusumba:tusumba@postgres:5432/tusumba
+    JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+    SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-service-token}
   depends_on:
     postgres:
       condition: service_healthy

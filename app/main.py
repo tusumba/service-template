@@ -2,8 +2,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from tusumba_common import install_error_handlers
 
-from app.api import health, v1
+from app.api import health, internal, v1
 from app.db import create_engine, create_sessionmaker
 from app.logging import configure_logging
 from app.middleware import RequestIdMiddleware
@@ -25,7 +26,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title=settings.service_name, lifespan=lifespan)
     app.state.settings = settings
+    install_error_handlers(app)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health.router)
     app.include_router(v1.router)
+    app.include_router(internal.router)
     return app
