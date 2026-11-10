@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 import pytest
 from faststream.rabbit import RabbitBroker
 from sqlalchemy import text
-from tusumba_contracts import ApplicationRejected
+from sqlalchemy.ext.asyncio import AsyncSession
+from tusumba_contracts import ApplicationRejected, BaseEvent, EventEnvelope
 
 from app.db import create_engine, create_sessionmaker
 from app.events import enqueue_event, publish_pending, subscribe_event
@@ -33,7 +34,7 @@ async def test_committed_outbox_is_published_and_duplicate_is_ignored(
     consumed = asyncio.Event()
     processed: list[uuid.UUID] = []
 
-    async def handle(session, envelope) -> None:  # type: ignore[no-untyped-def]
+    async def handle(session: AsyncSession, envelope: EventEnvelope[BaseEvent]) -> None:
         processed.append(envelope.event_id)
         consumed.set()
 
@@ -41,7 +42,6 @@ async def test_committed_outbox_is_published_and_duplicate_is_ignored(
         async with sessions.begin() as session:
             event_id = enqueue_event(session, event)
 
-        # The producing transaction has committed before the broker is even connected.
         async with sessions() as session:
             row = await session.get(OutboxMessage, event_id)
             assert row is not None and row.published_at is None
@@ -58,13 +58,19 @@ async def test_committed_outbox_is_published_and_duplicate_is_ignored(
         try:
             assert await publish_pending(sessions, broker) == 1
             await asyncio.wait_for(consumed.wait(), timeout=10)
+
+            async def processed_marker_committed() -> None:
+                while True:
+                    async with sessions() as session:
+                        if await session.get(ProcessedEvent, event_id) is not None:
+                            return
+                    await asyncio.sleep(0.01)
+
+            await asyncio.wait_for(processed_marker_committed(), timeout=10)
             async with sessions() as session:
                 row = await session.get(OutboxMessage, event_id)
                 assert row is not None and row.published_at is not None
-                marker = await session.get(ProcessedEvent, event_id)
-                assert marker is not None
 
-            # A retry after a publish/commit gap sends the original event_id.
             async with sessions.begin() as session:
                 row = await session.get(OutboxMessage, event_id)
                 assert row is not None
@@ -92,7 +98,7 @@ async def test_failed_handler_rolls_back_deduplication_and_domain_change(
                 text("CREATE TABLE service_template.delivery_probe (event_id uuid PRIMARY KEY)")
             )
 
-        async def fails(session, envelope) -> None:  # type: ignore[no-untyped-def]
+        async def fails(session: AsyncSession, envelope: EventEnvelope[BaseEvent]) -> None:
             await session.execute(
                 text("INSERT INTO delivery_probe (event_id) VALUES (:id)"), {"id": event_id}
             )
@@ -107,7 +113,7 @@ async def test_failed_handler_rolls_back_deduplication_and_domain_change(
             assert await session.get(ProcessedEvent, event_id) is None
             assert await session.scalar(text("SELECT count(*) FROM delivery_probe")) == 0
 
-        async def succeeds(session, envelope) -> None:  # type: ignore[no-untyped-def]
+        async def succeeds(session: AsyncSession, envelope: EventEnvelope[BaseEvent]) -> None:
             await session.execute(
                 text("INSERT INTO delivery_probe (event_id) VALUES (:id)"), {"id": event_id}
             )

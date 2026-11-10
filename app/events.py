@@ -1,5 +1,3 @@
-"""Reliable event publication and idempotent consumption for a service database."""
-
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -19,7 +17,6 @@ EventHandler = Callable[[AsyncSession, EventEnvelope[BaseEvent]], Awaitable[None
 
 
 def enqueue_event(session: AsyncSession, event: BaseEvent) -> uuid.UUID:
-    """Add an event to the caller's transaction with its domain changes."""
     envelope = event.envelope()
     session.add(
         OutboxMessage(
@@ -34,7 +31,6 @@ def enqueue_event(session: AsyncSession, event: BaseEvent) -> uuid.UUID:
 async def publish_pending(
     sessions: async_sessionmaker[AsyncSession], broker: RabbitBroker, *, limit: int = 100
 ) -> int:
-    """Publish committed rows and mark them only after RabbitMQ confirms delivery."""
     published = 0
     for _ in range(limit):
         async with sessions.begin() as session:
@@ -65,7 +61,6 @@ async def process_event(
     message: dict[str, Any],
     handler: EventHandler,
 ) -> bool:
-    """Commit the deduplication marker and domain changes in one transaction."""
     envelope = parse_envelope(message)
     async with sessions.begin() as session:
         inserted = await session.scalar(
@@ -88,8 +83,6 @@ def subscribe_event(
     routing_key: str,
     handler: EventHandler,
 ) -> None:
-    """Bind a durable service queue; failed handlers are requeued by RabbitMQ."""
-
     @broker.subscriber(
         RabbitQueue(queue, durable=True, routing_key=routing_key),
         EVENT_EXCHANGE,

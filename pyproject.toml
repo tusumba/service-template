@@ -57,7 +57,10 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 
-# В tusumba-common нет py.typed: проверяем её по аннотациям в исходниках.
 [[tool.mypy.overrides]]
 module = ["tusumba_common", "tusumba_common.*"]
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.schedulers.asyncio"]
+ignore_missing_imports = true

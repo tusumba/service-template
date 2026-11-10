@@ -1,9 +1,3 @@
-"""Transactional outbox and processed event journal.
-
-Revision ID: 0001
-Revises:
-"""
-
 from collections.abc import Sequence
 
 import sqlalchemy as sa
