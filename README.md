@@ -31,7 +31,7 @@
 uv sync
 cp .env.example .env
 uv run python -m tusumba_common.testing dev-keys   # тестовая пара ключей, впишите public.pem в JWT_PUBLIC_KEY
-docker compose up -d postgres
+docker compose up -d postgres rabbitmq
 uv run alembic upgrade head
 uv run --env-file .env uvicorn app.main:create_app --factory --reload
 ```
@@ -61,6 +61,8 @@ uv run pytest
 | Переменная | По умолчанию | Что это |
 |---|---|---|
 | `DATABASE_URL` | обязательна | `postgresql+asyncpg://user:password@host:5432/db` |
+| `RABBITMQ_URL` | обязательна | адрес RabbitMQ, например `amqp://guest:guest@localhost:5672/` |
+| `OUTBOX_POLL_SECONDS` | `1.0` | интервал отправки событий из outbox в секундах |
 | `SERVICE_NAME` | имя сервиса | попадает в логи |
 | `LOG_LEVEL` | `INFO` | уровень логов |
 | `LOG_JSON` | `true` | `false` — читаемые логи для отладки |
@@ -83,6 +85,20 @@ uv run pytest
 
 Примеры `/v1/example/...` и `/internal/example/ping` замените своими роутерами. Тесты на токены и формат
 ошибок - `tests/test_auth.py`, токены выпускает `tusumba_common.testing.make_token`.
+
+## События
+
+`app.events.enqueue_event(session, event)` создаёт конверт контракта и добавляет запись в outbox.
+Вызывайте его с той же `AsyncSession`, в которой меняются данные сервиса, до общего `commit`.
+После коммита встроенный APScheduler отправляет ожидающие записи в RabbitMQ через FastStream и помечает
+их отправленными после подтверждения публикации. Если отправка прервётся, запись останется в outbox
+для следующей попытки с тем же `event_id`.
+
+Для приёма зарегистрируйте обработчик через `subscribe_event(broker, sessions, queue=...,
+routing_key=..., handler=...)` **до** `broker.start()` в `app/main.py`. Обработчик получает `AsyncSession`
+и разобранный `EventEnvelope`; его изменения и ID обработанного события фиксируются одной транзакцией.
+При ошибке транзакция откатывается, а сообщение возвращается в очередь. Используйте отдельное имя
+очереди для каждого сервиса и routing key из `tusumba-contracts`.
 
 ## Структура
 
